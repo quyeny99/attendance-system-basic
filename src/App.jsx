@@ -7,13 +7,11 @@ import Dashboard from "./pages/Dashboard";
 function App() {
   return (
     <>
-      <div>
-        <Routes>
-          <Route path="/" element={<Home></Home>}></Route>
-          <Route path="/login" element={<Login></Login>}></Route>
-          <Route path="/dashboard" element={<Dashboard></Dashboard>}></Route>
-        </Routes>
-      </div>
+      <Routes>
+        <Route path="/" element={<Home></Home>}></Route>
+        <Route path="/login" element={<Login></Login>}></Route>
+        <Route path="/dashboard" element={<Dashboard></Dashboard>}></Route>
+      </Routes>
     </>
   );
 }
