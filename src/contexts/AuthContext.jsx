@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { employeeService } from "../services/api";
 
 const AuthContext = createContext();
 
@@ -10,14 +11,21 @@ export function AuthProvider({ children }) {
     // Kiểm tra localStorage khi component mount
     const savedUser = localStorage.getItem("user");
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (error) {
+        console.log(error);
+        localStorage.removeItem("user");
+      }
     }
     setIsLoading(false);
   }, []);
 
-  const login = (userData) => {
+  const login = async (employeeId, password) => {
+    const userData = await employeeService.login(employeeId, password);
     setUser(userData);
     localStorage.setItem("user", JSON.stringify(userData));
+    return userData;
   };
 
   const logout = () => {
@@ -32,6 +40,7 @@ export function AuthProvider({ children }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
