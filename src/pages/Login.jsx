@@ -79,7 +79,7 @@ const LoginPage = () => {
       <div className="max-w-md w-full">
         {/* Logo/Title */}
         <div className="text-center mb-8">
-          <div className="mx-auto h-16 w-16 bg-blue-600 rounded-full flex items-center justify-center mb-4">
+          <div className="mx-auto h-16 w-16 rounded-full flex items-center justify-center mb-4">
             <img src="/logo.png" alt="logo" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900">Đăng Nhập</h2>
@@ -172,7 +172,7 @@ const LoginPage = () => {
           </form>
 
           {/* Demo Info */}
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          {/* <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
             <p className="text-sm text-blue-700 font-medium mb-2">
               🔑 Thông tin demo:
             </p>
@@ -180,7 +180,7 @@ const LoginPage = () => {
               Admin: <strong>admin123</strong> | Nhân viên:{" "}
               <strong>123456</strong>
             </p>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { attendanceService, employeeService } from "../services/api";
+import Pagination from "./Pagination";
 
 const AttendanceReport = () => {
   const [attendanceData, setAttendanceData] = useState([]);
@@ -76,7 +77,6 @@ const AttendanceReport = () => {
 
   const handleDateChange = (date) => {
     setSelectedDate(date);
-    // Clear month/year khi chọn ngày cụ thể
     if (date) {
       setSelectedMonth("");
       setSelectedYear("");
@@ -86,7 +86,6 @@ const AttendanceReport = () => {
 
   const handleMonthChange = (month) => {
     setSelectedMonth(month);
-    // Clear ngày cụ thể khi chọn tháng
     if (month) {
       setSelectedDate("");
     }
@@ -95,7 +94,6 @@ const AttendanceReport = () => {
 
   const handleYearChange = (year) => {
     setSelectedYear(year);
-    // Clear ngày cụ thể khi chọn năm
     if (year) {
       setSelectedDate("");
     }
@@ -108,6 +106,10 @@ const AttendanceReport = () => {
     setSelectedMonth("");
     setSelectedYear("");
     setCurrentPage(1);
+  };
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
   };
 
   // Format functions
@@ -449,87 +451,15 @@ const AttendanceReport = () => {
         </table>
       </div>
 
-      {/* Pagination */}
-      {!loading && totalPages > 1 && (
-        <div className="flex items-center justify-between mt-6">
-          <div className="text-sm text-gray-500">
-            Hiển thị {(currentPage - 1) * recordsPerPage + 1} -{" "}
-            {Math.min(currentPage * recordsPerPage, totalRecords)}
-            trong tổng số {totalRecords} bản ghi
-          </div>
-
-          <div className="flex items-center space-x-2">
-            {/* Previous button */}
-            <button
-              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200"
-            >
-              Trước
-            </button>
-
-            {/* Page numbers */}
-            {(() => {
-              const delta = 2;
-              const range = [];
-              const rangeWithDots = [];
-
-              for (
-                let i = Math.max(2, currentPage - delta);
-                i <= Math.min(totalPages - 1, currentPage + delta);
-                i++
-              ) {
-                range.push(i);
-              }
-
-              if (currentPage - delta > 2) {
-                rangeWithDots.push(1, "...");
-              } else {
-                rangeWithDots.push(1);
-              }
-
-              rangeWithDots.push(...range);
-
-              if (currentPage + delta < totalPages - 1) {
-                rangeWithDots.push("...", totalPages);
-              } else {
-                rangeWithDots.push(totalPages);
-              }
-
-              return rangeWithDots.map((page, index) =>
-                page === "..." ? (
-                  <span key={index} className="px-3 py-2 text-sm text-gray-500">
-                    ...
-                  </span>
-                ) : (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentPage(page)}
-                    className={`px-3 py-2 text-sm rounded-lg ${
-                      currentPage === page
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                  >
-                    {page}
-                  </button>
-                )
-              );
-            })()}
-
-            {/* Next button */}
-            <button
-              onClick={() =>
-                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-              }
-              disabled={currentPage === totalPages}
-              className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200"
-            >
-              Sau
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Smart Pagination */}
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={handlePageChange}
+        totalRecords={totalRecords}
+        recordsPerPage={recordsPerPage}
+        showQuickJumper={true}
+      />
     </div>
   );
 };
