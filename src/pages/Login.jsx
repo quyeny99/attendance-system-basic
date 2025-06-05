@@ -27,7 +27,7 @@ const LoginPage = () => {
     try {
       setLoadingEmployees(true);
       const data = await employeeService.getAllEmployees();
-      setEmployees(data);
+      setEmployees(data.data);
     } catch (error) {
       console.error("Error loading employees:", error);
       setError("Không thể tải danh sách nhân viên");
@@ -79,7 +79,7 @@ const LoginPage = () => {
       <div className="max-w-md w-full">
         {/* Logo/Title */}
         <div className="text-center mb-8">
-          <div className="mx-auto h-16 w-16 bg-primary rounded-full flex items-center justify-center mb-4">
+          <div className="mx-auto h-16 w-16 bg-blue-600 rounded-full flex items-center justify-center mb-4">
             <img src="/logo.png" alt="logo" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900">Đăng Nhập</h2>

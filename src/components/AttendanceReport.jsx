@@ -6,9 +6,11 @@ const AttendanceReport = () => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedEmployee, setSelectedEmployee] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
   const recordsPerPage = 10;
 
   useEffect(() => {
@@ -18,16 +20,18 @@ const AttendanceReport = () => {
   useEffect(() => {
     loadFilteredAttendance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEmployee, selectedMonth, selectedYear]);
+  }, [
+    selectedEmployee,
+    selectedDate,
+    selectedMonth,
+    selectedYear,
+    currentPage,
+  ]);
 
   const loadInitialData = async () => {
     try {
       setLoading(true);
-      const [attendanceData, employeeData] = await Promise.all([
-        attendanceService.getAllAttendanceRecords(),
-        employeeService.getAllEmployees(),
-      ]);
-      setAttendanceData(attendanceData);
+      const employeeData = await employeeService.getAllEmployeesNoPagination();
       setEmployees(employeeData.filter((emp) => emp.role !== "admin"));
     } catch (error) {
       console.error("Error loading initial data:", error);
@@ -42,12 +46,19 @@ const AttendanceReport = () => {
       const filters = {};
 
       if (selectedEmployee) filters.employeeId = selectedEmployee;
-      if (selectedMonth) filters.month = selectedMonth;
-      if (selectedYear) filters.year = selectedYear;
+      if (selectedDate) filters.date = selectedDate;
+      else {
+        if (selectedMonth) filters.month = selectedMonth;
+        if (selectedYear) filters.year = selectedYear;
+      }
 
-      const data = await attendanceService.getFilteredAttendance(filters);
-      setAttendanceData(data);
-      setCurrentPage(1);
+      const result = await attendanceService.getFilteredAttendance(
+        filters,
+        currentPage,
+        recordsPerPage
+      );
+      setAttendanceData(result.data);
+      setTotalRecords(result.total);
     } catch (error) {
       console.error("Error loading filtered attendance:", error);
     } finally {
@@ -55,30 +66,48 @@ const AttendanceReport = () => {
     }
   };
 
-  // Filter và pagination logic
-  const totalPages = Math.ceil(attendanceData.length / recordsPerPage);
-  const currentRecords = attendanceData.slice(
-    (currentPage - 1) * recordsPerPage,
-    currentPage * recordsPerPage
-  );
+  const totalPages = Math.ceil(totalRecords / recordsPerPage);
 
-  // Handler functions
+  // Handler functions với reset page
   const handleEmployeeChange = (employeeId) => {
     setSelectedEmployee(employeeId);
+    setCurrentPage(1);
+  };
+
+  const handleDateChange = (date) => {
+    setSelectedDate(date);
+    // Clear month/year khi chọn ngày cụ thể
+    if (date) {
+      setSelectedMonth("");
+      setSelectedYear("");
+    }
+    setCurrentPage(1);
   };
 
   const handleMonthChange = (month) => {
     setSelectedMonth(month);
+    // Clear ngày cụ thể khi chọn tháng
+    if (month) {
+      setSelectedDate("");
+    }
+    setCurrentPage(1);
   };
 
   const handleYearChange = (year) => {
     setSelectedYear(year);
+    // Clear ngày cụ thể khi chọn năm
+    if (year) {
+      setSelectedDate("");
+    }
+    setCurrentPage(1);
   };
 
   const handleClearFilters = () => {
     setSelectedEmployee("");
+    setSelectedDate("");
     setSelectedMonth("");
     setSelectedYear("");
+    setCurrentPage(1);
   };
 
   // Format functions
@@ -103,9 +132,8 @@ const AttendanceReport = () => {
     return `${hours}h ${minutes}p`;
   };
 
-  // Statistics
+  // Statistics cho trang hiện tại
   const stats = useMemo(() => {
-    const totalRecords = attendanceData.length;
     const completedRecords = attendanceData.filter(
       (record) => record.check_out
     ).length;
@@ -124,7 +152,7 @@ const AttendanceReport = () => {
       completedRecords,
       totalHours: Math.round(totalHours * 10) / 10,
     };
-  }, [attendanceData]);
+  }, [attendanceData, totalRecords]);
 
   const months = [
     { value: "", label: "Tất cả tháng" },
@@ -155,7 +183,7 @@ const AttendanceReport = () => {
         <div>
           <h3 className="text-xl font-bold text-gray-800">Báo Cáo Chấm Công</h3>
           <p className="text-sm text-gray-500 mt-1">
-            Tổng cộng: {attendanceData.length} bản ghi
+            Tổng cộng: {totalRecords} bản ghi
           </p>
         </div>
 
@@ -176,9 +204,10 @@ const AttendanceReport = () => {
           <span>Xuất Excel</span>
         </button>
       </div>
+
       {/* Filter Controls */}
       <div className="bg-gray-50 rounded-lg p-4 mb-6 border border-gray-200">
-        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex flex-col sm:flex-row gap-4 flex-1">
             {/* Filter theo nhân viên */}
             <div className="flex-1">
@@ -199,6 +228,19 @@ const AttendanceReport = () => {
               </select>
             </div>
 
+            {/* Filter theo ngày cụ thể */}
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Ngày cụ thể
+              </label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => handleDateChange(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white"
+              />
+            </div>
+
             {/* Filter theo tháng */}
             <div className="flex-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -207,7 +249,8 @@ const AttendanceReport = () => {
               <select
                 value={selectedMonth}
                 onChange={(e) => handleMonthChange(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white"
+                disabled={!!selectedDate}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white disabled:bg-gray-100"
               >
                 {months.map((month) => (
                   <option key={month.value} value={month.value}>
@@ -225,7 +268,8 @@ const AttendanceReport = () => {
               <select
                 value={selectedYear}
                 onChange={(e) => handleYearChange(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white"
+                disabled={!!selectedDate}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white disabled:bg-gray-100"
               >
                 {years.map((year) => (
                   <option key={year.value} value={year.value}>
@@ -261,12 +305,15 @@ const AttendanceReport = () => {
         </div>
 
         {/* Hiển thị filter hiện tại */}
-        {(selectedEmployee || selectedMonth || selectedYear) && (
+        {(selectedEmployee ||
+          selectedDate ||
+          selectedMonth ||
+          selectedYear) && (
           <div className="mt-4 pt-4 border-t border-gray-200">
             <div className="flex flex-wrap gap-2">
               <span className="text-sm text-gray-600">Đang lọc theo:</span>
               {selectedEmployee && (
-                <span className="px-2 py-1 text-xs bg-pink-500 text-white rounded-full">
+                <span className="px-2 py-1 text-xs bg-blue-600 text-white rounded-full">
                   {
                     employees.find(
                       (emp) => emp.id === parseInt(selectedEmployee)
@@ -274,12 +321,17 @@ const AttendanceReport = () => {
                   }
                 </span>
               )}
-              {selectedMonth && (
+              {selectedDate && (
+                <span className="px-2 py-1 text-xs bg-orange-500 text-white rounded-full">
+                  {formatDate(selectedDate)}
+                </span>
+              )}
+              {selectedMonth && !selectedDate && (
                 <span className="px-2 py-1 text-xs bg-blue-500 text-white rounded-full">
                   {months.find((m) => m.value === selectedMonth)?.label}
                 </span>
               )}
-              {selectedYear && (
+              {selectedYear && !selectedDate && (
                 <span className="px-2 py-1 text-xs bg-green-500 text-white rounded-full">
                   Năm {selectedYear}
                 </span>
@@ -288,159 +340,194 @@ const AttendanceReport = () => {
           </div>
         )}
       </div>
-      {loading ? (
-        <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
-          <div className="animate-pulse">
-            <div className="h-6 bg-gray-200 rounded w-1/4 mb-4"></div>
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="h-16 bg-gray-200 rounded"></div>
-              ))}
+
+      {/* Thống kê nhanh */}
+      {!loading && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+            <div className="text-sm text-blue-600">Tổng bản ghi</div>
+            <div className="text-2xl font-bold text-blue-700">
+              {stats.totalRecords}
+            </div>
+          </div>
+          <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+            <div className="text-sm text-green-600">Hoàn thành (trang này)</div>
+            <div className="text-2xl font-bold text-green-700">
+              {stats.completedRecords}
+            </div>
+          </div>
+          <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+            <div className="text-sm text-purple-600">Tổng giờ (trang này)</div>
+            <div className="text-2xl font-bold text-purple-700">
+              {stats.totalHours}h
             </div>
           </div>
         </div>
-      ) : (
-        <div>
-          {/* Thống kê nhanh */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-              <div className="text-sm text-blue-600">Tổng bản ghi</div>
-              <div className="text-2xl font-bold text-blue-700">
-                {stats.totalRecords}
-              </div>
-            </div>
-            <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-              <div className="text-sm text-green-600">Hoàn thành</div>
-              <div className="text-2xl font-bold text-green-700">
-                {stats.completedRecords}
-              </div>
-            </div>
-            <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-              <div className="text-sm text-purple-600">Tổng giờ</div>
-              <div className="text-2xl font-bold text-purple-700">
-                {stats.totalHours}h
-              </div>
-            </div>
-          </div>
+      )}
 
-          {/* Bảng dữ liệu */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-4 py-3">STT</th>
-                  <th className="px-4 py-3">Nhân viên</th>
-                  <th className="px-4 py-3">Phòng ban</th>
-                  <th className="px-4 py-3">Ngày</th>
-                  <th className="px-4 py-3">Check In</th>
-                  <th className="px-4 py-3">Check Out</th>
-                  <th className="px-4 py-3">Thời gian làm việc</th>
-                  <th className="px-4 py-3">Trạng thái</th>
+      {/* Bảng dữ liệu */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm text-left">
+          <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="px-4 py-3">STT</th>
+              <th className="px-4 py-3">Nhân viên</th>
+              <th className="px-4 py-3">Phòng ban</th>
+              <th className="px-4 py-3">Ngày</th>
+              <th className="px-4 py-3">Check In</th>
+              <th className="px-4 py-3">Check Out</th>
+              <th className="px-4 py-3">Thời gian làm việc</th>
+              <th className="px-4 py-3">Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              [...Array(5)].map((_, i) => (
+                <tr key={i} className="bg-white border-b border-gray-100">
+                  <td colSpan="8" className="px-4 py-4">
+                    <div className="animate-pulse flex space-x-4">
+                      <div className="h-4 bg-gray-200 rounded w-1/8"></div>
+                      <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                      <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+                      <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+                      <div className="h-4 bg-gray-200 rounded w-1/8"></div>
+                      <div className="h-4 bg-gray-200 rounded w-1/8"></div>
+                      <div className="h-4 bg-gray-200 rounded w-1/8"></div>
+                      <div className="h-4 bg-gray-200 rounded w-1/8"></div>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {currentRecords.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan="8"
-                      className="px-4 py-8 text-center text-gray-500"
+              ))
+            ) : attendanceData.length === 0 ? (
+              <tr>
+                <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                  Không có dữ liệu chấm công phù hợp với bộ lọc
+                </td>
+              </tr>
+            ) : (
+              attendanceData.map((record, index) => (
+                <tr
+                  key={record.id}
+                  className="bg-white border-b border-gray-100 hover:bg-gray-50"
+                >
+                  <td className="px-4 py-3 text-gray-700">
+                    {(currentPage - 1) * recordsPerPage + index + 1}
+                  </td>
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    {record.employees?.name || "N/A"}
+                  </td>
+                  <td className="px-4 py-3 text-gray-700">
+                    {record.employees?.department || "N/A"}
+                  </td>
+                  <td className="px-4 py-3 text-gray-700">
+                    {formatDate(record.check_in)}
+                  </td>
+                  <td className="px-4 py-3 text-green-600 font-semibold">
+                    {formatTime(record.check_in)}
+                  </td>
+                  <td className="px-4 py-3 text-red-600 font-semibold">
+                    {record.check_out ? formatTime(record.check_out) : "--:--"}
+                  </td>
+                  <td className="px-4 py-3 font-bold text-primary">
+                    {calculateDuration(record.check_in, record.check_out)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`px-2 py-1 text-xs rounded-full ${
+                        record.check_out
+                          ? "bg-green-100 text-green-700"
+                          : "bg-yellow-100 text-yellow-700"
+                      }`}
                     >
-                      Không có dữ liệu chấm công phù hợp với bộ lọc
-                    </td>
-                  </tr>
-                ) : (
-                  currentRecords.map((record, index) => (
-                    <tr
-                      key={record.id}
-                      className="bg-white border-b border-gray-100 hover:bg-gray-50"
-                    >
-                      <td className="px-4 py-3 text-gray-700">
-                        {(currentPage - 1) * recordsPerPage + index + 1}
-                      </td>
-                      <td className="px-4 py-3 font-medium text-gray-900">
-                        {record.employees?.name || "N/A"}
-                      </td>
-                      <td className="px-4 py-3 text-gray-700">
-                        {record.employees?.department || "N/A"}
-                      </td>
-                      <td className="px-4 py-3 text-gray-700">
-                        {formatDate(record.check_in)}
-                      </td>
-                      <td className="px-4 py-3 text-green-600 font-semibold">
-                        {formatTime(record.check_in)}
-                      </td>
-                      <td className="px-4 py-3 text-red-600 font-semibold">
-                        {record.check_out
-                          ? formatTime(record.check_out)
-                          : "--:--"}
-                      </td>
-                      <td className="px-4 py-3 font-bold text-primary">
-                        {calculateDuration(record.check_in, record.check_out)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`px-2 py-1 text-xs rounded-full ${
-                            record.check_out
-                              ? "bg-green-100 text-green-700"
-                              : "bg-yellow-100 text-yellow-700"
-                          }`}
-                        >
-                          {record.check_out ? "Hoàn thành" : "Đang làm việc"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                      {record.check_out ? "Hoàn thành" : "Đang làm việc"}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-between mt-6">
+          <div className="text-sm text-gray-500">
+            Hiển thị {(currentPage - 1) * recordsPerPage + 1} -{" "}
+            {Math.min(currentPage * recordsPerPage, totalRecords)}
+            trong tổng số {totalRecords} bản ghi
           </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-6">
-              <div className="text-sm text-gray-500">
-                Hiển thị {(currentPage - 1) * recordsPerPage + 1} -{" "}
-                {Math.min(currentPage * recordsPerPage, attendanceData.length)}{" "}
-                trong tổng số {attendanceData.length} bản ghi
-              </div>
+          <div className="flex items-center space-x-2">
+            {/* Previous button */}
+            <button
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200"
+            >
+              Trước
+            </button>
 
-              <div className="flex space-x-2">
-                <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.max(prev - 1, 1))
-                  }
-                  disabled={currentPage === 1}
-                  className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200"
-                >
-                  Trước
-                </button>
+            {/* Page numbers */}
+            {(() => {
+              const delta = 2;
+              const range = [];
+              const rangeWithDots = [];
 
-                {[...Array(totalPages)].map((_, i) => (
+              for (
+                let i = Math.max(2, currentPage - delta);
+                i <= Math.min(totalPages - 1, currentPage + delta);
+                i++
+              ) {
+                range.push(i);
+              }
+
+              if (currentPage - delta > 2) {
+                rangeWithDots.push(1, "...");
+              } else {
+                rangeWithDots.push(1);
+              }
+
+              rangeWithDots.push(...range);
+
+              if (currentPage + delta < totalPages - 1) {
+                rangeWithDots.push("...", totalPages);
+              } else {
+                rangeWithDots.push(totalPages);
+              }
+
+              return rangeWithDots.map((page, index) =>
+                page === "..." ? (
+                  <span key={index} className="px-3 py-2 text-sm text-gray-500">
+                    ...
+                  </span>
+                ) : (
                   <button
-                    key={i + 1}
-                    onClick={() => setCurrentPage(i + 1)}
+                    key={index}
+                    onClick={() => setCurrentPage(page)}
                     className={`px-3 py-2 text-sm rounded-lg ${
-                      currentPage === i + 1
+                      currentPage === page
                         ? "bg-blue-600 text-white"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
                   >
-                    {i + 1}
+                    {page}
                   </button>
-                ))}
+                )
+              );
+            })()}
 
-                <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                  }
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200"
-                >
-                  Sau
-                </button>
-              </div>
-            </div>
-          )}
+            {/* Next button */}
+            <button
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+              }
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200"
+            >
+              Sau
+            </button>
+          </div>
         </div>
       )}
     </div>

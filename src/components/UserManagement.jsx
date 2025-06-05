@@ -15,16 +15,31 @@ const UserManagement = () => {
     password: "",
   });
   const [submitting, setSubmitting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const recordsPerPage = 10;
 
   useEffect(() => {
     loadEmployees();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage]);
 
   const loadEmployees = async () => {
     try {
       setLoading(true);
-      const data = await employeeService.getAllEmployees();
-      setEmployees(data.filter((emp) => emp.role !== "admin"));
+      const result = await employeeService.getAllEmployees(
+        currentPage,
+        recordsPerPage
+      );
+      // const filteredEmployees = result.data.filter(
+      //   (emp) => emp.role !== "admin"
+      // );
+      setEmployees(result.data);
+
+      // Điều chỉnh total để loại trừ admin
+      const totalNonAdmin =
+        result.total - result.data.filter((emp) => emp.role === "admin").length;
+      setTotalRecords(totalNonAdmin);
     } catch (error) {
       console.error("Error loading employees:", error);
       alert("Có lỗi xảy ra khi tải danh sách nhân viên");
@@ -102,6 +117,13 @@ const UserManagement = () => {
     try {
       await employeeService.deleteEmployee(userId);
       await loadEmployees();
+
+      // Nếu trang hiện tại không còn dữ liệu, quay về trang trước
+      const totalPages = Math.ceil((totalRecords - 1) / recordsPerPage);
+      if (currentPage > totalPages && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      }
+
       alert("Xóa nhân viên thành công");
     } catch (error) {
       console.error("Error deleting employee:", error);
@@ -122,6 +144,8 @@ const UserManagement = () => {
     });
   };
 
+  const totalPages = Math.ceil(totalRecords / recordsPerPage);
+
   if (loading) {
     return (
       <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
@@ -140,10 +164,15 @@ const UserManagement = () => {
   return (
     <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xl font-bold text-gray-800">Quản Lý Nhân Viên</h3>
+        <div>
+          <h3 className="text-xl font-bold text-gray-800">Quản Lý Nhân Viên</h3>
+          <p className="text-sm text-gray-500 mt-1">
+            Tổng cộng: {totalRecords} nhân viên
+          </p>
+        </div>
         <button
           onClick={() => setShowAddForm(true)}
-          className="bg-blue-400 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+          className="bg-blue-600 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
         >
           + Thêm Nhân Viên
         </button>
@@ -238,6 +267,7 @@ const UserManagement = () => {
         <table className="w-full text-sm text-left">
           <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
             <tr>
+              <th className="px-4 py-3">STT</th>
               <th className="px-4 py-3">Họ tên</th>
               <th className="px-4 py-3">Email</th>
               <th className="px-4 py-3">Chức vụ</th>
@@ -247,11 +277,14 @@ const UserManagement = () => {
             </tr>
           </thead>
           <tbody>
-            {employees.map((employee) => (
+            {employees.map((employee, index) => (
               <tr
                 key={employee.id}
                 className="bg-white border-b border-gray-100 hover:bg-gray-50"
               >
+                <td className="px-4 py-3 text-gray-700">
+                  {(currentPage - 1) * recordsPerPage + index + 1}
+                </td>
                 <td className="px-4 py-3 font-medium text-gray-900">
                   {employee.name}
                 </td>
@@ -268,24 +301,32 @@ const UserManagement = () => {
                         : "bg-gray-100 text-gray-700"
                     }`}
                   >
-                    {employee.role === "manager" ? "Quản lý" : "Nhân viên"}
+                    {employee.role === "manager"
+                      ? "Quản lý"
+                      : employee.role === "admin"
+                      ? "Admin"
+                      : "Nhân viên"}
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleEditUser(employee)}
-                      className="text-blue-600 hover:text-blue-800"
-                    >
-                      Sửa
-                    </button>
-                    <button
-                      onClick={() => handleDeleteUser(employee.id)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      Xóa
-                    </button>
-                  </div>
+                  {employee.role !== "admin" && (
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleEditUser(employee)}
+                        disabled={submitting}
+                        className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                      >
+                        Sửa
+                      </button>
+                      <button
+                        onClick={() => handleDeleteUser(employee.id)}
+                        disabled={submitting}
+                        className="text-red-600 hover:text-red-800 disabled:opacity-50"
+                      >
+                        Xóa
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -296,6 +337,51 @@ const UserManagement = () => {
       {employees.length === 0 && (
         <div className="text-center py-8 text-gray-500">
           Chưa có nhân viên nào
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-6">
+          <div className="text-sm text-gray-500">
+            Hiển thị {(currentPage - 1) * recordsPerPage + 1} -{" "}
+            {Math.min(currentPage * recordsPerPage, totalRecords)}
+            trong tổng số {totalRecords} nhân viên
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200"
+            >
+              Trước
+            </button>
+
+            {[...Array(totalPages)].map((_, i) => (
+              <button
+                key={i + 1}
+                onClick={() => setCurrentPage(i + 1)}
+                className={`px-3 py-2 text-sm rounded-lg ${
+                  currentPage === i + 1
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+
+            <button
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+              }
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200"
+            >
+              Sau
+            </button>
+          </div>
         </div>
       )}
     </div>
